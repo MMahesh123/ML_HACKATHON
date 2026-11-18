@@ -87,12 +87,13 @@ def list_evaluation_trips():
     """Returns the list of reserved evaluator-testing trip IDs (falls back to
     the student-testing partition during development, before the evaluator
     partition is released)."""
-    search_dir = EVALUATOR_TEST_DIR if EVALUATOR_TEST_DIR.exists() and any(EVALUATOR_TEST_DIR.iterdir()) else STUDENT_TEST_DIR
-    if not search_dir.exists():
-        return []
+    evaluator_trip_ids = sorted(p.stem for p in EVALUATOR_TEST_DIR.glob("*/*.track")) if EVALUATOR_TEST_DIR.exists() else []
+    if evaluator_trip_ids:
+        return evaluator_trip_ids
 
-    trip_ids = sorted(p.stem for p in search_dir.glob("*/*.track"))
-    return trip_ids
+    if not STUDENT_TEST_DIR.exists():
+        return []
+    return sorted(p.stem for p in STUDENT_TEST_DIR.glob("*/*.track"))
 
 
 @app.post("/predict", response_model=TripPredictionResponse)
