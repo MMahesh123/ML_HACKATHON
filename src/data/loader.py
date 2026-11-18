@@ -80,10 +80,13 @@ class TripDataLoader:
         Loads all available data for a single trip.
         Looks for files: <trip_id>.track, <trip_id>.nodes, <trip_id>.arcs, <trip_id>.route
         """
-        track_file = trip_dir / f"{trip_id}.track"
-        nodes_file = trip_dir / f"{trip_id}.nodes"
-        arcs_file = trip_dir / f"{trip_id}.arcs"
-        route_file = trip_dir / f"{trip_id}.route"
+        # Handle both flat trip_dir and nested trip_dir/<trip_id>
+        base_dir = trip_dir / trip_id if (trip_dir / trip_id).is_dir() else trip_dir
+
+        track_file = base_dir / f"{trip_id}.track"
+        nodes_file = base_dir / f"{trip_id}.nodes"
+        arcs_file = base_dir / f"{trip_id}.arcs"
+        route_file = base_dir / f"{trip_id}.route"
 
         track_df = cls.load_track(track_file) if track_file.exists() else None
         nodes_df = cls.load_nodes(nodes_file) if nodes_file.exists() else None

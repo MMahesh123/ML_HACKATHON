@@ -1,0 +1,26 @@
+{
+  "model_name": "HistGradientBoostingClassifier",
+  "algorithm_family": "Boosting",
+  "best_hyperparameters": {
+    "learning_rate": 0.08660232730676608,
+    "max_iter": 250,
+    "max_leaf_nodes": 37,
+    "min_samples_leaf": 30,
+    "l2_regularization": 0.02557288186438182
+  },
+  "best_cv_top1_accuracy": 0.14288238221319202,
+  "student_test_top1_accuracy": 0.6340814196242172,
+  "feature_columns": [
+    "point_segment_distance_m",
+    "heading_difference_deg",
+    "gps_speed_mps",
+    "segment_length_m",
+    "segment_bearing_deg",
+    "time_gap_s",
+    "candidate_rank_distance"
+  ],
+  "seed": 42,
+  "n_trials": 20,
+  "target_definition": "1 = aligned reference road arc; 0 = other candidate road arc",
+  "validation_strategy": "5-Fold GroupKFold grouped by trip_id (zero leakage across trips)"
+}
