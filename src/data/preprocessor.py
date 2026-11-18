@@ -46,11 +46,17 @@ def align_route_to_track(
     nodes_df: pd.DataFrame,
 ) -> Optional[np.ndarray]:
     """Aligns the chronological reference .route (one arc per route-step, not
-    one per GPS fix) to the .track observations by nearest-position matching.
+    one per GPS fix) to the .track observations.
+
+    Uses an order-preserving dynamic-programming alignment: it finds the
+    assignment of every GPS observation to a route step that minimises total
+    perpendicular distance subject to the route index being monotonically
+    non-decreasing. A greedy nearest-step scan cannot do this - an early
+    mistaken jump forward is irreversible, so the alignment runs ahead of the
+    vehicle and strands later observations on arcs hundreds of metres away.
 
     Returns an array of length len(track_df) giving the reference arc_id for
-    each GPS observation, or None if no route is available. Unmatched
-    observations (should not normally happen) get -1.
+    each GPS observation, or None if no route is available.
     """
     if route_arcs is None or len(route_arcs) == 0:
         return None
@@ -59,36 +65,48 @@ def align_route_to_track(
     node_xy = projector.to_xy(nodes_df["longitude"].values, nodes_df["latitude"].values)
 
     arcs_indexed = arcs_df.set_index("arc_id")
-    valid_route_arcs = [a for a in route_arcs if a in arcs_indexed.index]
-    if not valid_route_arcs:
+    valid_route_arcs = np.asarray([a for a in route_arcs if a in arcs_indexed.index])
+    if len(valid_route_arcs) == 0:
         return None
 
-    route_from = arcs_indexed.loc[valid_route_arcs, "from_node_id"].values.astype(np.int64)
-    route_to = arcs_indexed.loc[valid_route_arcs, "to_node_id"].values.astype(np.int64)
-    route_mid = (node_xy[route_from] + node_xy[route_to]) / 2.0
+    node_pos = {int(nid): i for i, nid in enumerate(nodes_df["node_id"].values)}
+    route_from = arcs_indexed.loc[valid_route_arcs, "from_node_id"].values
+    route_to = arcs_indexed.loc[valid_route_arcs, "to_node_id"].values
+    seg_a = node_xy[[node_pos[int(n)] for n in route_from]]
+    seg_b = node_xy[[node_pos[int(n)] for n in route_to]]
 
     track_xy = projector.to_xy(track_df["longitude"].values, track_df["latitude"].values)
+    n_track, n_route = len(track_xy), len(valid_route_arcs)
 
-    # For each GPS point, find the nearest point along the (ordered) route
-    # polyline by nearest route-step midpoint, but constrained to be
-    # monotonically non-decreasing in route order so the chronology of the
-    # reference route is respected.
-    labels = np.full(len(track_df), -1, dtype=np.int64)
-    last_route_idx = 0
-    n_route = len(valid_route_arcs)
-    window = max(20, n_route // max(len(track_df), 1) + 10)
+    ab = seg_b - seg_a
+    ab_len2 = np.einsum("ij,ij->i", ab, ab)
+    ab_len2_safe = np.where(ab_len2 > 0, ab_len2, 1.0)
 
-    for i in range(len(track_df)):
-        lo = last_route_idx
-        hi = min(n_route, last_route_idx + window)
-        if hi <= lo:
-            hi = n_route
-        segment = route_mid[lo:hi]
-        if len(segment) == 0:
-            break
-        dists = np.linalg.norm(segment - track_xy[i], axis=1)
-        best = int(np.argmin(dists)) + lo
-        labels[i] = valid_route_arcs[best]
-        last_route_idx = best
+    def step_costs(point: np.ndarray) -> np.ndarray:
+        """Perpendicular distance from one GPS point to every route segment."""
+        ap = point - seg_a
+        t = np.clip(np.einsum("ij,ij->i", ap, ab) / ab_len2_safe, 0.0, 1.0)
+        closest = seg_a + t[:, None] * ab
+        return np.linalg.norm(point - closest, axis=1)
+
+    route_idx = np.arange(n_route)
+    backptr = np.empty((n_track, n_route), dtype=np.int32)
+    prev = step_costs(track_xy[0])
+    backptr[0] = route_idx
+
+    for i in range(1, n_track):
+        running_min = np.minimum.accumulate(prev)
+        # Index of the best predecessor at or before each route step. Step 0 is
+        # always a new minimum, so 0 is a safe fill value for the accumulate.
+        best_prev = np.maximum.accumulate(np.where(prev <= running_min, route_idx, 0))
+        prev = step_costs(track_xy[i]) + running_min
+        backptr[i] = best_prev
+
+    labels = np.empty(n_track, dtype=np.int64)
+    j = int(np.argmin(prev))
+    for i in range(n_track - 1, -1, -1):
+        labels[i] = valid_route_arcs[j]
+        if i > 0:
+            j = int(backptr[i, j])
 
     return labels
