@@ -94,18 +94,29 @@ def create_folium_map(
                 coords.append([float(node_latlon[v, 0]), float(node_latlon[v, 1])])
         return coords
 
+    def continuous_runs(coords: List[List[float]]) -> List[List[List[float]]]:
+        """Splits [start, end] arc pairs into physically continuous runs, so a
+        polyline never draws a straight fake road across a gap."""
+        runs: List[List[List[float]]] = []
+        for start, end in zip(coords[0::2], coords[1::2]):
+            if runs and runs[-1][-2:] == [start, end]:
+                continue
+            if runs and runs[-1][-1] == start:
+                runs[-1].append(end)
+            else:
+                runs.append([start, end])
+        return runs
+
     if ground_truth_route is not None:
         gt_layer = folium.FeatureGroup(name="Reference Ground Truth (.route)", show=True)
-        gt_coords = extract_coords_from_arcs(ground_truth_route)
-        if gt_coords:
-            folium.PolyLine(gt_coords, color="#00aa44", weight=5, opacity=0.8, tooltip="Ground Truth Route").add_to(gt_layer)
+        for run in continuous_runs(extract_coords_from_arcs(ground_truth_route)):
+            folium.PolyLine(run, color="#00aa44", weight=5, opacity=0.8, tooltip="Ground Truth Route").add_to(gt_layer)
         gt_layer.add_to(m)
 
     if predicted_arcs is not None:
         pred_layer = folium.FeatureGroup(name="PathSnap Reconstructed Route", show=True)
-        pred_coords = extract_coords_from_arcs(predicted_arcs)
-        if pred_coords:
-            folium.PolyLine(pred_coords, color="#e63946", weight=3, dash_array="6, 6", tooltip="Predicted Route").add_to(pred_layer)
+        for run in continuous_runs(extract_coords_from_arcs(predicted_arcs)):
+            folium.PolyLine(run, color="#e63946", weight=3, dash_array="6, 6", tooltip="Predicted Route").add_to(pred_layer)
         pred_layer.add_to(m)
 
     folium.LayerControl().add_to(m)

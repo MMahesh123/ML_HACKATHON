@@ -18,6 +18,8 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap');
 
 html, body, [class*="st-"] { font-family: 'Space Grotesk', sans-serif; }
+/* Streamlit renders its icons as ligatures in this font; overriding it shows the raw icon names. */
+[data-testid="stIconMaterial"] { font-family: 'Material Symbols Rounded' !important; }
 
 .stApp {
     background:
@@ -209,7 +211,7 @@ else:
     macro_f1 = metrics.get("macro_f1")
     col2.metric("Macro F1-Score", f"{macro_f1:.4f}" if macro_f1 is not None else "N/A")
     col3.metric("Route Continuity", f"{metrics['route_continuity'] * 100:.2f}%")
-    col4.metric("Inference Latency", f"{metrics['inference_time_ms']:.1f} ms")
+    col4.metric("Inference Latency", f"{metrics['inference_time_ms']:.0f} ms")
     st.caption(f"Model: {metrics.get('model_name', 'unknown')}")
 
     st.markdown("---")
@@ -244,14 +246,26 @@ else:
     gps_group.add_to(m)
 
     if pred_coords:
+        # The API returns arcs as consecutive [start, end] coordinate pairs. Start
+        # a new line wherever an arc does not begin where the previous one ended;
+        # a single polyline would draw straight fake roads across those gaps.
+        runs = []
+        for start, end in zip(pred_coords[0::2], pred_coords[1::2]):
+            if runs and runs[-1][-2:] == [start, end]:
+                continue
+            if runs and runs[-1][-1] == start:
+                runs[-1].append(end)
+            else:
+                runs.append([start, end])
         pred_group = folium.FeatureGroup(name="PathSnap Predicted Route (Red/Orange)")
-        folium.PolyLine(
-            locations=pred_coords,
-            color="red",
-            weight=3,
-            dash_array="5, 5",
-            tooltip="Reconstructed PathSnap Route",
-        ).add_to(pred_group)
+        for run in runs:
+            folium.PolyLine(
+                locations=run,
+                color="red",
+                weight=3,
+                dash_array="5, 5",
+                tooltip="Reconstructed PathSnap Route",
+            ).add_to(pred_group)
         pred_group.add_to(m)
 
     folium.LayerControl().add_to(m)

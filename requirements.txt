@@ -34,6 +34,9 @@ requests>=2.31.0
 pyarrow>=14.0.0
 tqdm>=4.65.0
 
+# Technical report generation
+reportlab>=4.0.0
+
 # Development & Notebooks
 jupyter>=1.0.0
 ipykernel>=6.25.0

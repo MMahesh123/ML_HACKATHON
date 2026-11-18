@@ -130,6 +130,17 @@ python -m pytest tests/ -v
 
 Both laptops need this repository, the venv, and `pip install -r requirements.txt`. **Only Laptop 1** needs the raw dataset and the exported model artifacts (`artifacts/models/`) — Laptop 2 only ever talks to Laptop 1's API.
 
+### Step 0 — Transfer the project
+
+The evaluator-testing partition is deliberately **not** in version control, so it is transferred separately from the code:
+
+| Archive | Contents | Goes to |
+|---|---|---|
+| `PathSnap.zip` | Code, retrained model artifacts, results, figures. No evaluator data. | Both laptops |
+| `PathSnap_EVALUATOR_DATA_do_not_share.zip` | The 10 evaluator trips, **including `.route` ground truth**. | Laptop 1 only |
+
+On Laptop 1, unzip the evaluator archive inside `data/raw/` so the trips land at `data/raw/evaluator_test/<trip_id>/`.
+
 ### Step 1 — Connect both laptops to the same network
 Use the venue Wi-Fi, or create a mobile hotspot on one laptop and connect the other to it. A hotspot is more reliable on crowded event Wi-Fi.
 
