@@ -1,0 +1,96 @@
+# Console output of the FastAPI server on Laptop 1 (a separate Windows laptop, Command Prompt).
+# Copied verbatim from the terminal; requests come from Laptop 2 (10.20.205.119) over the LAN.
+# 127.0.0.1 lines are requests made on Laptop 1 itself.
+INFO:     Started server process [23108]
+INFO:     Waiting for application startup.
+[2026-11-18 16:41:45,747] INFO in main: Loaded model 'tuned_lightgbm' for inference.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:16211 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:16211 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:16211 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:16211 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:16211 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:16211 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:16211 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:16211 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     10.20.205.119:49997 - "GET /health HTTP/1.1" 200 OK
+INFO:     10.20.205.119:49998 - "GET /trips HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17815 - "GET /health HTTP/1.1" 200 OK
+[2026-11-18 16:44:42,132] INFO in main: Received inference request for trip: 00000015
+INFO:     127.0.0.1:41825 - "GET /trips HTTP/1.1" 200 OK
+[2026-11-18 16:44:54,570] INFO in main: Trip 00000015 inference completed in 6244.90 ms | Top-1: 0.8570177998249198 | Continuity: 0.9984 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50002 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:44:54,863] INFO in main: Received inference request for trip: 00000017
+[2026-11-18 16:44:58,490] INFO in main: Trip 00000017 inference completed in 2330.54 ms | Top-1: 0.9197622585438335 | Continuity: 0.9985 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50007 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:44:58,891] INFO in main: Received inference request for trip: 00000023
+[2026-11-18 16:44:59,834] INFO in main: Trip 00000023 inference completed in 538.29 ms | Top-1: 0.6222707423580786 | Continuity: 0.9847 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50008 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:44:59,944] INFO in main: Received inference request for trip: 00000030
+[2026-11-18 16:45:01,630] INFO in main: Trip 00000030 inference completed in 1005.74 ms | Top-1: 0.8486238532110092 | Continuity: 0.9969 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50009 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:45:01,937] INFO in main: Received inference request for trip: 00000049
+[2026-11-18 16:45:07,352] INFO in main: Trip 00000049 inference completed in 2426.41 ms | Top-1: 0.8838001514004542 | Continuity: 0.9799 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50012 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:45:07,721] INFO in main: Received inference request for trip: 00000059
+[2026-11-18 16:45:10,400] INFO in main: Trip 00000059 inference completed in 1663.74 ms | Top-1: 0.9214354995150339 | Continuity: 0.9971 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50015 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:45:10,538] INFO in main: Received inference request for trip: 00000067
+[2026-11-18 16:45:12,409] INFO in main: Trip 00000067 inference completed in 950.68 ms | Top-1: 0.9279475982532751 | Continuity: 0.9956 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50019 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:45:12,538] INFO in main: Received inference request for trip: 00000073
+[2026-11-18 16:45:15,497] INFO in main: Trip 00000073 inference completed in 1740.01 ms | Top-1: 0.9571678321678322 | Continuity: 0.9974 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50021 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:45:15,694] INFO in main: Received inference request for trip: 00000087
+[2026-11-18 16:45:19,654] INFO in main: Trip 00000087 inference completed in 2541.19 ms | Top-1: 0.9435310936383131 | Continuity: 0.9843 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50023 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:45:19,908] INFO in main: Received inference request for trip: 00000094
+[2026-11-18 16:45:27,255] INFO in main: Trip 00000094 inference completed in 4005.46 ms | Top-1: 0.9325077399380804 | Continuity: 0.9994 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50024 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:45:45,191] INFO in main: Received inference request for trip: 00000067
+[2026-11-18 16:45:46,997] INFO in main: Trip 00000067 inference completed in 1006.24 ms | Top-1: 0.9279475982532751 | Continuity: 0.9956 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50032 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:45:47,575] INFO in main: Received inference request for trip: 00000073
+[2026-11-18 16:45:50,348] INFO in main: Trip 00000073 inference completed in 1666.95 ms | Top-1: 0.9571678321678322 | Continuity: 0.9974 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50033 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:45:51,232] INFO in main: Received inference request for trip: 00000017
+[2026-11-18 16:45:55,826] INFO in main: Trip 00000017 inference completed in 2815.94 ms | Top-1: 0.9197622585438335 | Continuity: 0.9985 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50034 - "POST /predict HTTP/1.1" 200 OK
+INFO:     10.20.205.119:50067 - "GET /health HTTP/1.1" 200 OK
+INFO:     10.20.205.119:50076 - "GET /trips HTTP/1.1" 200 OK
+INFO:     10.20.205.119:50080 - "GET /trips HTTP/1.1" 200 OK
+[2026-11-18 16:47:45,185] INFO in main: Received inference request for trip: 00000015
+[2026-11-18 16:47:49,551] INFO in main: Trip 00000015 inference completed in 1930.37 ms | Top-1: 0.8570177998249198 | Continuity: 0.9984 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50081 - "POST /predict HTTP/1.1" 200 OK
+INFO:     10.20.205.119:50098 - "GET /trips HTTP/1.1" 200 OK
+INFO:     10.20.205.119:50100 - "GET /trips HTTP/1.1" 200 OK
+INFO:     10.20.205.119:50105 - "GET /trips HTTP/1.1" 200 OK
+[2026-11-18 16:48:25,902] INFO in main: Received inference request for trip: 00000067
+[2026-11-18 16:48:26,577] INFO in main: Trip 00000067 inference completed in 364.76 ms | Top-1: 0.9279475982532751 | Continuity: 0.9956 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50108 - "POST /predict HTTP/1.1" 200 OK
+INFO:     10.20.205.119:50112 - "GET /trips HTTP/1.1" 200 OK
+[2026-11-18 16:48:47,553] INFO in main: Received inference request for trip: 00000017
+[2026-11-18 16:48:49,033] INFO in main: Trip 00000017 inference completed in 932.91 ms | Top-1: 0.9197622585438335 | Continuity: 0.9985 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50116 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:48:49,159] INFO in main: Received inference request for trip: 00000023
+[2026-11-18 16:48:49,565] INFO in main: Trip 00000023 inference completed in 231.58 ms | Top-1: 0.6222707423580786 | Continuity: 0.9847 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50117 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:48:49,632] INFO in main: Received inference request for trip: 00000030
+[2026-11-18 16:48:50,299] INFO in main: Trip 00000030 inference completed in 406.92 ms | Top-1: 0.8486238532110092 | Continuity: 0.9969 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50119 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:48:50,390] INFO in main: Received inference request for trip: 00000049
+[2026-11-18 16:48:52,226] INFO in main: Trip 00000049 inference completed in 820.04 ms | Top-1: 0.8838001514004542 | Continuity: 0.9799 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50120 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:48:52,345] INFO in main: Received inference request for trip: 00000059
+[2026-11-18 16:48:53,322] INFO in main: Trip 00000059 inference completed in 521.35 ms | Top-1: 0.9214354995150339 | Continuity: 0.9971 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50121 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:48:53,425] INFO in main: Received inference request for trip: 00000073
+[2026-11-18 16:48:54,346] INFO in main: Trip 00000073 inference completed in 493.20 ms | Top-1: 0.9571678321678322 | Continuity: 0.9974 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50122 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:48:54,437] INFO in main: Received inference request for trip: 00000087
+[2026-11-18 16:48:55,781] INFO in main: Trip 00000087 inference completed in 801.60 ms | Top-1: 0.9435310936383131 | Continuity: 0.9843 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50123 - "POST /predict HTTP/1.1" 200 OK
+[2026-11-18 16:48:55,882] INFO in main: Received inference request for trip: 00000094
+[2026-11-18 16:48:58,229] INFO in main: Trip 00000094 inference completed in 1217.00 ms | Top-1: 0.9325077399380804 | Continuity: 0.9994 | Model: tuned_lightgbm
+INFO:     10.20.205.119:50124 - "POST /predict HTTP/1.1" 200 OK

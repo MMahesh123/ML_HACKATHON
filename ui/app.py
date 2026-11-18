@@ -6,6 +6,8 @@ import streamlit as st
 import folium
 from streamlit_folium import st_folium
 
+MAX_GPS_MARKERS = 1500
+
 # Streamlit page layout configuration
 st.set_page_config(
     page_title="PathSnap — Evaluator Interface",
@@ -239,9 +241,17 @@ else:
         center_lat, center_lon = 12.9716, 77.5946
 
     m = folium.Map(location=[center_lat, center_lon], zoom_start=15, tiles="OpenStreetMap")
+    if gps_points:
+        lats = [pt["latitude"] for pt in gps_points]
+        lons = [pt["longitude"] for pt in gps_points]
+        m.fit_bounds([[min(lats), min(lons)], [max(lats), max(lons)]], padding=(20, 20))
 
+    # Every fix gets its own marker and popup; trips with several thousand fixes
+    # take tens of seconds for the browser to draw. Show evenly spaced fixes only
+    # (display-only: the route, metrics and arc list all use every fix).
+    marker_step = max(1, -(-len(gps_points) // MAX_GPS_MARKERS))
     gps_group = folium.FeatureGroup(name="Observed GPS Trajectory (Noisy)")
-    for pt in gps_points:
+    for pt in gps_points[::marker_step]:
         folium.CircleMarker(
             location=[pt["latitude"], pt["longitude"]],
             radius=3,
@@ -278,6 +288,8 @@ else:
 
     folium.LayerControl().add_to(m)
     st_folium(m, width="100%", height=600, key="pathsnap_map")
+    if marker_step > 1:
+        st.caption(f"Map shows every {marker_step}th of {len(gps_points):,} GPS fixes for speed; the predicted route and metrics use all of them.")
 
     with st.expander("📋 View Predicted Road Arc IDs"):
         st.write(data.get("predicted_arcs", []))

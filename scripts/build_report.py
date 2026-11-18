@@ -93,6 +93,18 @@ align = pd.read_csv(RESULTS_DIR / "alignment_validation.csv")
 st = pd.read_csv(RESULTS_DIR / "final_model_student_test_by_trip.csv", dtype={"trip_id": str})
 rev = pd.read_csv(RESULTS_DIR / "hmm_reverse_direction_errors.csv", dtype={"trip_id": str})
 
+import re
+
+_log_lines = (PROJECT_ROOT / "reports" / "laptop1_console_log.txt").read_text().splitlines()
+_latencies_ms = [float(m.group(1)) for l in _log_lines if (m := re.search(r"inference completed in ([\d.]+) ms", l))]
+_LOG_STATS = {
+    "lat_min": min(_latencies_ms) / 1000,
+    "lat_max": max(_latencies_ms) / 1000,
+    "n_predict": sum('"POST /predict' in l and "200 OK" in l for l in _log_lines),
+}
+_completed = [l for l in _log_lines if "inference completed" in l][:10]
+_LOG_EXCERPT = [l for l in _log_lines if "Loaded model" in l or "Uvicorn running" in l] + _completed
+
 tuned = tvu[tvu["Configuration"].str.startswith("Bayesian")].iloc[0]
 untuned = tvu[tvu["Configuration"].str.startswith("Untuned")].iloc[0]
 
@@ -419,19 +431,17 @@ bullets([
     "(<font face='Courier'>src/api/schemas.py</font>) has no field for ground truth.",
     "<b>Laptop 2</b> (<font face='Courier'>ui/app.py</font>): Streamlit lists the trips from <font face='Courier'>/trips</font>, "
     "sends the selected id to Laptop 1 over the LAN and renders the metrics and a Folium map of the response.",
-    "<b>Integration test.</b> All 10 evaluator-testing trips were run through <font face='Courier'>POST /predict</font> on the "
-    "deployed server; all returned HTTP 200, with latencies between about 0.1 and 1.5 s per trip.",
+    "<b>Integration test.</b> All 10 evaluator-testing trips were requested from Laptop 2 (a Mac) and served by Laptop 1 "
+    "(a separate Windows laptop) over the venue Wi-Fi. All returned HTTP 200 with real metrics; per-request latency on "
+    "Laptop 1 ranged from {lat_min:.1f} to {lat_max:.1f} s, the slowest being the first, cold request.".format(**_LOG_STATS),
 ])
-figure(SHOT / "ui_results.jpg", "Figure 14. Evaluator UI after a reconstruction request (metrics computed by Laptop 1).", 15)
+figure(SHOT / "ui_results.jpg", "Figure 14. Evaluator UI on Laptop 2 after a reconstruction request. The sidebar shows the API endpoint on Laptop 1 (10.20.203.238:8000); the metrics are computed there.", 15)
 figure(SHOT / "ui_map.jpg", "Figure 15. Evaluator UI map for the same request: GPS fixes (blue) and predicted route (dashed red).", 15)
-p("<b>API log on the serving laptop</b> (excerpt from the uvicorn console during the requests above):")
-log_lines = []
-try:
-    with open("/tmp/pathsnap_api.log") as fh:
-        log_lines = [l.rstrip() for l in fh if "inference" in l or "POST /predict" in l][-6:]
-except OSError:
-    pass
-story.append(Paragraph("<br/>".join(l.replace("&", "&amp;").replace("<", "&lt;") for l in log_lines) or "(log not available on this machine)", CODE))
+p("<b>API console on Laptop 1.</b> Excerpt of the uvicorn console on the receiving laptop: server start-up, then the first "
+  f"10 requests, one per evaluator trip, each logged server-side with its Top-1 and route continuity. In total "
+  f"{_LOG_STATS['n_predict']} <font face='Courier'>POST /predict</font> requests from Laptop 2 returned 200 OK. "
+  "The complete console output is committed as <font face='Courier'>reports/laptop1_console_log.txt</font>.")
+story.append(Paragraph("<br/>".join(l.replace("&", "&amp;").replace("<", "&lt;") for l in _LOG_EXCERPT), CODE))
 story.append(Spacer(1, 6))
 
 # ---------------------------------------------------------------- 8 limitations & integrity
