@@ -1,11 +1,11 @@
 """Pydantic schemas for the FastAPI backend service."""
 
-from typing import Dict, List, Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
 class TripPredictionRequest(BaseModel):
-    trip_id: str = Field(..., description="The ID of the trip to reconstruct, e.g., 'trip_01'")
+    trip_id: str = Field(..., description="The ID of the trip to reconstruct, e.g., '00000001'")
 
 
 class GPSPoint(BaseModel):
@@ -14,20 +14,14 @@ class GPSPoint(BaseModel):
     timestamp: float
 
 
-class RouteSegment(BaseModel):
-    arc_id: int
-    from_node: int
-    to_node: int
-    from_coord: List[float]  # [lat, lon]
-    to_coord: List[float]    # [lat, lon]
-
-
 class EvaluationMetrics(BaseModel):
+    """Server-side-computed metrics only. Never includes raw ground-truth arcs."""
     top_1_accuracy: float
-    macro_f1: float
+    macro_f1: Optional[float] = None
     route_continuity: float
     inference_time_ms: float
     candidate_miss_rate: Optional[float] = None
+    model_name: Optional[str] = None
 
 
 class TripPredictionResponse(BaseModel):
@@ -36,5 +30,4 @@ class TripPredictionResponse(BaseModel):
     predicted_arcs: List[int]
     metrics: EvaluationMetrics
     gps_trajectory: List[GPSPoint]
-    predicted_route_coords: List[List[float]]  # List of [lat, lon] for UI plotting
-    ground_truth_route_coords: Optional[List[List[float]]] = None  # Coordinate polylines for UI map rendering
+    predicted_route_coords: List[List[float]]  # [lat, lon] pairs for UI plotting

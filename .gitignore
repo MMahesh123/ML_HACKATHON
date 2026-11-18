@@ -49,6 +49,8 @@ venv.bak/
 Thumbs.db
 
 # Large archives & compressed artifacts
+# (data/raw/ is intentionally committed - see bf47503)
+data/processed/
 *.tar.gz
 *.zip
 

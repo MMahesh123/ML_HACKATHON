@@ -1,0 +1,29 @@
+{
+  "model_name": "tuned_lightgbm",
+  "feature_columns": [
+    "perp_distance_m",
+    "proj_fraction",
+    "heading_diff_deg",
+    "candidate_rank",
+    "arc_length_m",
+    "speed_mps",
+    "time_gap_s",
+    "prev_arc_connected"
+  ],
+  "best_params": {
+    "n_estimators": 300,
+    "num_leaves": 44,
+    "max_depth": 6,
+    "learning_rate": 0.05279921386602365,
+    "min_child_samples": 74,
+    "subsample": 0.9210887204441781,
+    "colsample_bytree": 0.649142229555474,
+    "reg_lambda": 4.606882949840221
+  },
+  "cv_macro_f1": 0.8185193642763593,
+  "student_test_metrics": {
+    "top_1_accuracy": 0.9328875277118331,
+    "macro_f1": 0.8070355814561991,
+    "log_loss": 0.1725019240085253
+  }
+}

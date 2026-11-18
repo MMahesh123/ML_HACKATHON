@@ -1,86 +1,106 @@
-"""Candidate generation and feature extraction for PathSnap."""
+"""Vectorised candidate road-segment generation for PathSnap.
 
-from typing import Dict, List, Tuple
+For every GPS observation we need the set of nearby road arcs ("candidates")
+that it might actually be travelling on. The original approach (iterrows +
+per-point geodesic calls) does not scale to trips whose road network has tens
+of thousands of nodes/arcs. This version:
+
+1. Builds arc endpoint/midpoint arrays once per trip in local planar meters.
+2. Builds a single cKDTree over arc midpoints.
+3. Answers candidate queries for *all* GPS points of a trip in one batched
+   query, then refines with the true perpendicular point-to-segment distance
+   (not just the midpoint distance) using vectorised numpy.
+"""
+
+from __future__ import annotations
+
+from typing import List, Optional
+
 import numpy as np
 import pandas as pd
-from geopy.distance import geodesic
-from scipy.spatial import KDTree
+from scipy.spatial import cKDTree
+
+from src.geo import LocalProjector, point_segment_projection
 
 
 class CandidateGenerator:
-    """
-    Identifies candidate road segments (.arcs) for each GPS observation point (.track)
-    within a spatial search radius.
-    """
+    """Identifies candidate arcs for GPS observations within a search radius."""
 
     def __init__(self, nodes_df: pd.DataFrame, arcs_df: pd.DataFrame, radius_meters: float = 50.0):
-        self.nodes_df = nodes_df.copy()
-        self.arcs_df = arcs_df.copy()
+        self.nodes_df = nodes_df
+        self.arcs_df = arcs_df
         self.radius_meters = radius_meters
-        self._prepare_arc_geometries()
 
-    def _prepare_arc_geometries(self):
-        """Precomputes midpoints and KDTree for fast spatial candidate search."""
-        midpoints = []
-        arc_metadata = []
+        all_lons = np.concatenate([nodes_df["longitude"].values])
+        all_lats = np.concatenate([nodes_df["latitude"].values])
+        self.projector = LocalProjector.from_coords(all_lons, all_lats)
 
-        for _, row in self.arcs_df.iterrows():
-            arc_id = int(row["arc_id"])
-            u = int(row["from_node_id"])
-            v = int(row["to_node_id"])
+        node_xy = self.projector.to_xy(nodes_df["longitude"].values, nodes_df["latitude"].values)
+        # node_id is assumed to equal the row index (0-based), as per the dataset spec.
+        self.node_xy = node_xy
 
-            u_node = self.nodes_df.loc[self.nodes_df["node_id"] == u]
-            v_node = self.nodes_df.loc[self.nodes_df["node_id"] == v]
+        from_idx = arcs_df["from_node_id"].values.astype(np.int64)
+        to_idx = arcs_df["to_node_id"].values.astype(np.int64)
+        valid = (from_idx < len(node_xy)) & (to_idx < len(node_xy)) & (from_idx >= 0) & (to_idx >= 0)
+        self._valid_arc_ids = arcs_df["arc_id"].values[valid]
+        self._a = node_xy[from_idx[valid]]
+        self._b = node_xy[to_idx[valid]]
+        self._mid = (self._a + self._b) / 2.0
+        self._from_node = from_idx[valid]
+        self._to_node = to_idx[valid]
 
-            if not u_node.empty and not v_node.empty:
-                u_lat, u_lon = u_node["latitude"].values[0], u_node["longitude"].values[0]
-                v_lat, v_lon = v_node["latitude"].values[0], v_node["longitude"].values[0]
-
-                mid_lat = (u_lat + v_lat) / 2.0
-                mid_lon = (u_lon + v_lon) / 2.0
-
-                midpoints.append([mid_lat, mid_lon])
-                arc_metadata.append({
-                    "arc_id": arc_id,
-                    "u_coords": (u_lat, u_lon),
-                    "v_coords": (v_lat, v_lon),
-                    "mid_coords": (mid_lat, mid_lon)
-                })
-
-        self.midpoints = np.array(midpoints)
-        self.arc_metadata = arc_metadata
-        if len(midpoints) > 0:
-            # Simple angular KDTree for candidate narrowing
-            self.kdtree = KDTree(self.midpoints)
+        if len(self._mid) > 0:
+            self.kdtree = cKDTree(self._mid)
         else:
             self.kdtree = None
 
-    def get_candidates_for_point(self, gps_lat: float, gps_lon: float, top_k: int = 10) -> List[Dict]:
+    def get_candidates_batch(
+        self,
+        lons: np.ndarray,
+        lats: np.ndarray,
+        top_k: int = 10,
+        search_multiplier: float = 2.5,
+    ) -> List[List[dict]]:
+        """Returns, for every (lon, lat) GPS point, a list of candidate dicts.
+
+        Each candidate dict has: arc_id, distance (m, perpendicular to segment),
+        t (projection fraction along the arc), from_node, to_node.
         """
-        Returns the top-k nearest candidate road segments with perpendicular/geodesic distance.
-        """
-        if self.kdtree is None or len(self.arc_metadata) == 0:
-            return []
+        n = len(lons)
+        if self.kdtree is None or n == 0:
+            return [[] for _ in range(n)]
 
-        # Convert radius from meters to approximate degrees (~111,000 meters per degree)
-        deg_radius = (self.radius_meters * 1.5) / 111000.0
-        indices = self.kdtree.query_ball_point([gps_lat, gps_lon], r=deg_radius)
+        pts_xy = self.projector.to_xy(np.asarray(lons), np.asarray(lats))
 
-        if not indices:
-            # Fallback to nearest 3 neighbors if no arcs in search radius
-            _, nearest = self.kdtree.query([gps_lat, gps_lon], k=min(3, len(self.arc_metadata)))
-            indices = [nearest] if np.isscalar(nearest) else list(nearest)
+        query_radius = self.radius_meters * search_multiplier
+        neighbor_lists = self.kdtree.query_ball_point(pts_xy, r=query_radius)
 
-        candidates = []
-        for idx in indices:
-            meta = self.arc_metadata[idx]
-            dist = geodesic((gps_lat, gps_lon), meta["mid_coords"]).meters
-            candidates.append({
-                "arc_id": meta["arc_id"],
-                "distance": dist,
-                "confidence": 1.0 / (1.0 + dist / 10.0),
-            })
+        results: List[List[dict]] = []
+        for i, idxs in enumerate(neighbor_lists):
+            if len(idxs) == 0:
+                # Fallback: nearest few midpoints regardless of radius.
+                k = min(top_k, len(self._mid))
+                _, nn_idx = self.kdtree.query(pts_xy[i], k=k)
+                idxs = [nn_idx] if np.isscalar(nn_idx) else list(nn_idx)
 
-        # Sort by distance and return top_k
-        candidates.sort(key=lambda x: x["distance"])
-        return candidates[:top_k]
+            idxs = np.asarray(idxs, dtype=np.int64)
+            p_rep = np.repeat(pts_xy[i][None, :], len(idxs), axis=0)
+            dist, t = point_segment_projection(p_rep, self._a[idxs], self._b[idxs])
+
+            order = np.argsort(dist)[:top_k]
+            cands = []
+            for j in order:
+                arc_idx = idxs[j]
+                cands.append({
+                    "arc_id": int(self._valid_arc_ids[arc_idx]),
+                    "distance": float(dist[j]),
+                    "t": float(t[j]),
+                    "from_node": int(self._from_node[arc_idx]),
+                    "to_node": int(self._to_node[arc_idx]),
+                })
+            results.append(cands)
+        return results
+
+    def get_candidates_for_point(self, gps_lon: float, gps_lat: float, top_k: int = 10) -> List[dict]:
+        """Single-point convenience wrapper (kept for API/UI call sites)."""
+        return self.get_candidates_batch([gps_lon], [gps_lat], top_k=top_k)[0]

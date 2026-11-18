@@ -1,0 +1,9 @@
+{
+  "n_train_trips": 80,
+  "n_student_test_trips": 10,
+  "mean_gps_points_per_trip": 2528.633333333333,
+  "mean_pct_1s_sampling": 0.9431847366476974,
+  "max_gap_seconds_observed": 153064.0,
+  "largest_road_network_nodes": 155003,
+  "smallest_road_network_nodes": 299
+}

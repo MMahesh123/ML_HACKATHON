@@ -1,7 +1,7 @@
 # PathSnap: Distributed Map-Matching & Route Reconstruction
 
-> **PES University — Department of Computer Science and Engineering**  
-> **Course:** UE24CS352A: Machine Learning  
+> **PES University — Department of Computer Science and Engineering**
+> **Course:** UE24CS352A: Machine Learning
 > **Challenge:** PathSnap — End-to-End Distributed Map-Matching & Sequence Route Reconstruction
 
 ---
@@ -10,272 +10,177 @@
 
 GPS tracking systems often suffer from measurement noise caused by urban canyons, multipath reflections, receiver clock errors, and low or irregular sampling frequencies. As a consequence, raw GPS points frequently appear to jump across buildings, drift into adjacent parallel streets, or exhibit unnatural velocity spikes.
 
-**PathSnap** is an end-to-end, distributed machine learning system engineered to reconstruct realistic, topologically valid vehicle trajectories by matching noisy GPS observations to an underlying road network graph. 
+**PathSnap** is an end-to-end, distributed machine learning system that reconstructs realistic, topologically valid vehicle trajectories by matching noisy GPS observations to an underlying road network graph.
 
 ### Key System Capabilities
-- **Geospatial Preprocessing & Candidate Generation:** Projects WGS84 angular coordinates into Cartesian planar coordinates (or uses geodesic distance calculations), identifies top road segment candidates within spatial search radii using spatial indices (k-d trees / R-trees).
-- **Candidate Classification (5+ Models):** Formulates candidate scoring using engineered spatial, heading, and distance features, rigorously benchmarking at least 5 distinct algorithm families (e.g., Logistic Regression/Naive Bayes, k-NN, Random Forest, XGBoost/LightGBM, Multi-Layer Perceptron).
-- **Bayesian Hyperparameter Optimization:** Uses Optuna to perform Bayesian optimization with group-aware cross-validation across training trips.
-- **Hidden Markov Model (HMM) & Viterbi Decoding:** Reconstructs continuous, topologically consistent routes by computing emission probabilities (from classifier confidence & spatial distances) and transition probabilities (from shortest road network path lengths vs. observed GPS displacements).
-- **Two-Laptop Distributed Deployment:** Deploys a decoupled architecture where **Laptop 1** hosts the FastAPI prediction server and HMM engine, and **Laptop 2** runs the evaluator-facing UI with interactive Folium maps.
+- **Vectorised geospatial preprocessing & candidate generation:** projects WGS84 coordinates to a local planar frame per trip and uses a `cKDTree` over arc midpoints to find candidate road segments for every GPS point in one batched query — fast enough to handle the largest road network in this dataset (88k nodes / 165k arcs) in well under a second.
+- **Candidate classification (6 models, 6 families):** Logistic Regression, distance-weighted k-NN, Decision Tree, Random Forest, LightGBM, and an MLP, benchmarked with group-aware (per-trip) cross-validation.
+- **Bayesian hyperparameter optimisation:** Optuna search over the strongest model family, using group-aware CV on the 80 training trips only.
+- **HMM + Viterbi decoding:** reconstructs a topologically consistent route using the classifier's candidate probabilities as emissions and bounded road-network shortest-path distances (measured from each candidate's own projected position on its arc, not just arc endpoints) as transitions.
+- **Two-laptop distributed deployment:** Laptop 1 hosts the FastAPI model/HMM server; Laptop 2 runs the Streamlit evaluator UI with interactive Folium maps.
 
 ---
 
-## 2. System Architecture
-
-PathSnap follows a strict distributed two-laptop deployment architecture as mandated by the evaluation guidelines:
-
-```mermaid
-flowchart LR
-    subgraph Laptop_2 ["Laptop 2: Client / Evaluator UI"]
-        UI["Streamlit / Evaluator UI"]
-        SelectTrip["Select Evaluation Trip (1 of 10)"]
-        Display["Interactive Folium Map & Metrics View"]
-        UI --> SelectTrip
-        SelectTrip -.->|"HTTP POST /predict (Trip ID)"| API
-        API -.->|"JSON (Predicted Arcs, Metrics, Lat/Lon Coordinates)"| Display
-    end
-
-    subgraph Laptop_1 ["Laptop 1: Server / Model API Engine"]
-        API["FastAPI Backend Server (:8000)"]
-        Preproc["Preprocessing & Spatial Candidate Generation"]
-        MLModel["Best ML Classifier (Bayesian-Tuned)"]
-        HMM["HMM & Viterbi Route Decoder"]
-        RoadGraph["Road Network Graph (.nodes, .arcs)"]
-        GroundTruth[("Server-side Ground Truth (.route)\n(Kept strictly private)")]
-        EvalEngine["Server-Side Accuracy & Continuity Evaluator"]
-
-        API --> Preproc
-        Preproc --> MLModel
-        MLModel --> HMM
-        RoadGraph --> HMM
-        HMM --> EvalEngine
-        GroundTruth --> EvalEngine
-        EvalEngine --> API
-    end
-```
-
----
-
-## 3. Repository Directory Structure
+## 2. Repository Structure
 
 ```text
 ML_HACKATHON/
 ├── data/
-│   ├── raw/
-│   │   ├── train/                 # 80 training trips (.track, .nodes, .arcs, .route)
-│   │   ├── student_test/          # 10 student testing trips (.track, .nodes, .arcs, .route)
-│   │   └── evaluator_test/        # 10 evaluator testing trips (.track, .nodes, .arcs)
-│   ├── processed/                 # Cached candidate sets, extracted feature matrices
-│   └── README.md                  # Dataset notes & schema documentation
-├── notebooks/
-│   ├── 01_eda_and_exploration.ipynb        # Exploratory Data Analysis & GPS analysis
-│   ├── 02_candidate_generation.ipynb       # Spatial candidate arc selection
-│   ├── 03_model_experimentation.ipynb      # Training & comparing 5+ algorithm families
-│   ├── 04_bayesian_optimization.ipynb      # Optuna Bayesian hyperparameter search
-│   └── 05_hmm_viterbi_evaluation.ipynb     # HMM Viterbi decoding & route continuity
+│   ├── raw/{train,student_test,evaluator_test}/<trip_id>/<trip_id>.{track,nodes,arcs,route}
+│   ├── processed/                 # Cached candidate+feature tables (parquet) + quality logs
+│   └── README.md
+├── scripts/
+│   ├── run_eda.py                 # Dataset inventory, quality log, sample Folium map
+│   └── run_full_pipeline.py       # build_dataset -> train -> bayesian_opt -> export, end to end
 ├── src/
-│   ├── __init__.py
-│   ├── config.py                  # Global configurations, paths, hyperparameter presets
+│   ├── config.py                  # Paths, candidate/HMM hyperparameters, API settings
+│   ├── geo.py                     # Local planar projection + vectorised distance/bearing helpers
+│   ├── pipeline.py                # Single source of truth: raw trip -> candidates -> model -> HMM
 │   ├── data/
-│   │   ├── __init__.py
-│   │   ├── loader.py              # Parsing .track, .nodes, .arcs, and .route files
-│   │   └── preprocessor.py        # Coordinate projections, noise filtering, time-gap handling
+│   │   ├── loader.py              # Parses .track / .nodes / .arcs / .route
+│   │   ├── preprocessor.py        # Cleaning, validation, route-to-track label alignment
+│   │   └── build_dataset.py       # Builds the supervised candidate-classification dataset
 │   ├── features/
-│   │   ├── __init__.py
-│   │   ├── candidate.py           # Spatial candidate generation using KDTree / spatial indexing
-│   │   └── extractor.py           # Feature engineering (perpendicular dist, heading delta, etc.)
+│   │   ├── candidate.py           # Vectorised cKDTree candidate generation
+│   │   └── extractor.py           # Feature engineering per (observation, candidate) pair
 │   ├── models/
-│   │   ├── __init__.py
-│   │   ├── train.py               # Multi-model training and evaluation pipeline
-│   │   ├── evaluate.py            # Metrics: Top-1 Acc, Macro F1, Log Loss, Miss Rate
-│   │   └── bayesian_opt.py        # Bayesian optimization scripts (Optuna)
+│   │   ├── train.py               # 6-model benchmark (CV + student-test + sequence-level)
+│   │   ├── evaluate.py            # Accuracy/F1/log-loss/route-continuity metrics
+│   │   ├── sequence_eval.py       # Per-trip end-to-end evaluation via src.pipeline
+│   │   ├── bayesian_opt.py        # Optuna search + tuned-vs-untuned comparison
+│   │   └── export.py              # Saves/loads the final model+scaler for the API
 │   ├── reconstruction/
-│   │   ├── __init__.py
-│   │   ├── graph.py               # Road network graph builder (NetworkX)
-│   │   ├── hmm.py                 # Emission and transition probability models
-│   │   └── viterbi.py             # Viterbi sequential decoder for route continuity
+│   │   ├── graph.py               # Road network graph, bounded shortest-path queries
+│   │   └── viterbi.py             # Emission/transition probabilities + Viterbi decoding
 │   ├── visualization/
-│   │   ├── __init__.py
-│   │   └── map_plotter.py         # Folium map generation (raw GPS, ground truth, predicted)
+│   │   └── map_plotter.py         # Folium maps (bounding-box clipped for large networks)
 │   └── api/
-│       ├── __init__.py
-│       ├── schemas.py             # Pydantic request & response models
+│       ├── schemas.py             # Pydantic request/response models (no ground truth fields)
 │       └── main.py                # FastAPI endpoints (Laptop 1 server)
 ├── ui/
-│   ├── __init__.py
-│   ├── app.py                     # Streamlit evaluator interface (Laptop 2 client)
-│   └── README.md                  # UI setup instructions
+│   └── app.py                     # Streamlit evaluator interface (Laptop 2 client)
 ├── artifacts/
-│   ├── models/                    # Saved model binaries (.joblib / .pkl)
-│   ├── scalers/                   # Saved feature scalers and transformers
+│   ├── models/                    # final_model.joblib, final_scaler.joblib, model_metadata.json
 │   ├── maps/                      # Exported interactive Folium HTML maps
-│   └── results/                   # Experiment comparison tables, CSV logs, Optuna study logs
-├── reports/
-│   └── figures/                   # Confusion matrices, loss curves, Folium screenshots for PDF
-├── tests/
-│   ├── test_data_loader.py        # Unit tests for dataset parsers
-│   ├── test_candidate.py          # Unit tests for candidate extraction
-│   └── test_viterbi.py            # Unit tests for Viterbi recurrence
-├── .gitignore
+│   └── results/                   # model_comparison.csv, bayesian_optimisation.json, dataset_summary.json
+├── reports/figures/                # Plots for the technical report PDF
+├── tests/                         # test_data_loader.py, test_candidate.py, test_viterbi.py
 ├── requirements.txt
 └── README.md
 ```
 
 ---
 
-## 4. Dataset Specification
+## 3. Dataset Specification
 
-The raw data is organized by trip, each containing whitespace-separated files without headers:
+Each trip folder `data/raw/<partition>/<trip_id>/` holds four whitespace-separated, header-less files:
 
-| File Extension | Content Description | Format & Structure |
+| File | Columns | Notes |
 | :--- | :--- | :--- |
-| `.track` | GPS observations for a trajectory | 3 columns: `longitude`, `latitude`, `timestamp` (seconds). Nominally 1 Hz (~97% exactly 1s apart). |
-| `.nodes` | Geographical road network nodes | 2 columns: `longitude`, `latitude`. 0-based row index serves as `node_id`. |
-| `.arcs` | Road segments connecting nodes | 2 columns: `from_node_id`, `to_node_id`. 0-based row index serves as `arc_id`. |
-| `.route` | Ground-truth reference route | 1 integer column: Chronological sequence of true `arc_id` values traversed. |
+| `.track` | `longitude, latitude, timestamp` | Nominally 1 Hz; ~97% of steps exactly 1s apart |
+| `.nodes` | `longitude, latitude` | 0-based row index = `node_id` |
+| `.arcs`  | `from_node_id, to_node_id` | 0-based row index = `arc_id` |
+| `.route` | `arc_id` | Chronological reference route (not infallible ground truth) |
 
-### Dataset Partitions & Partitioning Rules
-- **Training (80 trips):** Model exploration, feature engineering, group-aware cross-validation, and Bayesian hyperparameter tuning.
-- **Student Testing (10 trips):** Development-stage comparative evaluation between untuned/tuned models and classifier vs. HMM.
-- **Evaluator Testing (10 trips):** Final demonstration evaluation only. Strictly isolated:
-  - No evaluator-test trip is accessed during training or hyperparameter search.
-  - Ground-truth `.route` files remain on Laptop 1 (server-side only) and are never exposed to the client UI.
+Partitions: **80 training trips**, **10 student-testing trips** (both included under `data/raw/`), and **10 evaluator-testing trips** (released separately by organisers at `data/raw/evaluator_test/` just before final evaluation — never used for training, feature selection or hyperparameter choice).
 
 ---
 
-## 5. Machine Learning & Route Reconstruction Pipeline
+## 4. Setup & Installation
 
-### 1. Data Exploration & Feature Engineering
-- **Geodesic / UTM Projection:** Angular coordinate pairs `(lon, lat)` are projected to local UTM coordinates for accurate Euclidean meter calculations, or computed via Haversine/Vincenty formulas.
-- **Candidate Arc Selection:** For each GPS point, candidates are extracted within a radius $R$ (e.g., 30–50 meters) using spatial indexing.
-- **Engineered Features:**
-  - Perpendicular distance from GPS observation to candidate road segment.
-  - Heading differential between vehicle trajectory heading ($\Delta \theta_{GPS}$) and road arc orientation ($\theta_{arc}$).
-  - Projection factor $t \in [0, 1]$ (position along the arc segment).
-  - Estimated velocity and acceleration consistency.
-  - Road network connectivity / degree of adjacent nodes.
-
-### 2. Multi-Model Benchmark (5 Algorithm Families)
-In accordance with hackathon requirements, at least 5 distinct algorithms are trained and compared using Group-K-Fold cross-validation (grouped by `trip_id`):
-1. **Linear / Probabilistic:** Logistic Regression (L2 regularized) or Gaussian Naive Bayes.
-2. **Instance-Based:** Distance-Weighted k-Nearest Neighbors ($k$-NN).
-3. **Tree-Based / Ensembles:** Random Forest Classifier.
-4. **Gradient Boosting:** LightGBM / XGBoost.
-5. **Neural Networks:** Multi-Layer Perceptron (MLP) with Dropout and Batch Normalization.
-
-### 3. Bayesian Hyperparameter Optimization
-- Optuna Bayesian optimization performs exploration over parameter spaces (e.g., tree depth, learning rate, regularization weights, number of estimators).
-- Metric optimized: Group Cross-Validation Macro F1-score across the 80 training trips.
-
-### 4. HMM & Viterbi Sequence Decoding
-Pointwise classification predictions alone often result in broken routes due to GPS noise. The HMM resolves this:
-- **Hidden States:** The set of candidate road segments ($arc_i$) for each observation time step $t$.
-- **Emission Probability $P(O_t \mid S_t)$:** Derived from the classifier output probability calibrated with spatial observation error (Gaussian noise model $d(O_t, S_t) \sim \mathcal{N}(0, \sigma^2)$).
-- **Transition Probability $P(S_{t+1} \mid S_t)$:** Derived from road-network shortest routing distance $d_{road}(S_t, S_{t+1})$ compared with great-circle GPS displacement $d_{euclid}(O_t, O_{t+1})$:
-  $$P(S_{t+1} \mid S_t) \propto \exp\left(-\frac{|d_{road} - d_{euclid}|}{\beta}\right)$$
-- **Viterbi Decoding:** Dynamically decodes the maximum a posteriori (MAP) sequence of topologically connected road segments over the entire trajectory.
-
----
-
-## 6. Setup & Installation
-
-### Prerequisites
-- Python 3.10 or 3.11
-- Git
-
-### 1. Clone Repository & Setup Virtual Environment
 ```bash
-git clone https://github.com/<your-username>/ML_HACKATHON.git
+git clone https://github.com/MMahesh123/ML_HACKATHON.git
 cd ML_HACKATHON
 
-# Create virtual environment
-python -m venv venv
+python3 -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
 
-# Activate virtual environment
-# Windows PowerShell:
-.\venv\Scripts\Activate.ps1
-# Linux/macOS:
-# source venv/bin/activate
-
-# Upgrade pip and install dependencies
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
----
-
-## 7. Execution & Deployment Guide
-
-### Running Experiments & Pipelines
-1. **Run Exploratory Data Analysis & Feature Extraction:**
-   ```bash
-   python -m src.data.preprocessor
-   python -m src.features.extractor
-   ```
-2. **Train and Compare Models:**
-   ```bash
-   python -m src.models.train
-   ```
-3. **Run Bayesian Optimization (Optuna):**
-   ```bash
-   python -m src.models.bayesian_opt
-   ```
-4. **Evaluate HMM & Generate Folium Visualizations:**
-   ```bash
-   python -m src.reconstruction.viterbi
-   ```
+Place the raw dataset under `data/raw/train/`, `data/raw/student_test/`, and (once released) `data/raw/evaluator_test/`, each containing one subfolder per trip as described above.
 
 ---
 
-### Two-Laptop Setup for Final Evaluation
+## 5. Running the Offline Pipeline
 
-#### Laptop 1: Model & API Server
-1. Ensure Laptop 1 and Laptop 2 are on the same local network (e.g., Wi-Fi or hotspot).
-2. Find Laptop 1's local IP address:
-   ```powershell
-   ipconfig   # Look for IPv4 Address (e.g., 192.168.1.50)
-   ```
-3. Start the FastAPI backend server bound to all network interfaces:
-   ```bash
-   uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
-   ```
-4. Verify backend health check by visiting `http://localhost:8000/health` or `http://<laptop-1-ip>:8000/docs`.
+Run everything in one command:
+```bash
+python -m scripts.run_full_pipeline
+```
+This builds the candidate dataset, benchmarks all 6 models, runs Bayesian optimisation on the strongest family, and exports `artifacts/models/final_model.joblib` + `final_scaler.joblib` for the API to load.
 
-#### Laptop 2: Evaluator User Interface
-1. Clone the repository and install dependencies on Laptop 2.
-2. Set the API host environment variable or configure it directly in the UI:
-   ```bash
-   # Set API endpoint to Laptop 1's IP
-   $env:API_URL="http://192.168.1.50:8000"   # Windows PowerShell
-   # export API_URL="http://192.168.1.50:8000" # Linux/macOS
-   ```
-3. Launch the Streamlit interface:
-   ```bash
-   streamlit run ui/app.py
-   ```
-4. In the UI:
-   - Select any of the 10 evaluation trips from the dropdown.
-   - Click **"Run Route Reconstruction"**.
-   - Inspect the interactive Folium map comparing raw GPS, ground-truth route, and predicted route, alongside observation-level Top-1 Accuracy, Macro F1, and Route Continuity metrics.
+Or run each stage individually:
+```bash
+python -m scripts.run_eda                 # dataset inventory, quality log, sample Folium map
+python -m src.data.build_dataset           # candidate generation + feature engineering -> data/processed/*.parquet
+python -m src.models.train                 # 6-model benchmark -> artifacts/results/model_comparison.csv
+python -m src.models.bayesian_opt          # Optuna search -> artifacts/results/bayesian_optimisation.json
+```
+
+Run the test suite:
+```bash
+python -m pytest tests/ -v
+```
 
 ---
 
-## 8. Evaluation Metrics
+## 6. Two-Laptop Evaluation Setup
 
-The system reports the following evaluation metrics:
-- **Observation-level Top-1 Accuracy:** Proportion of GPS observations correctly mapped to the exact reference arc.
-- **Macro F1-score:** Unweighted mean of F1 scores across candidate classes.
-- **Log Loss:** Cross-entropy loss reflecting prediction confidence calibration.
-- **Candidate Miss Rate:** Percentage of time steps where the true reference arc was not present in the candidate set.
-- **Route Continuity (%):** Fraction of consecutive predicted road segments that form a valid, connected path in the road network graph.
-- **Inference Time (ms):** Total latency to process and decode an entire trajectory.
+Both laptops need this repository, the venv, and `pip install -r requirements.txt`. **Only Laptop 1** needs the raw dataset and the exported model artifacts (`artifacts/models/`) — Laptop 2 only ever talks to Laptop 1's API.
+
+### Step 1 — Connect both laptops to the same network
+Use the venue Wi-Fi, or create a mobile hotspot on one laptop and connect the other to it. A hotspot is more reliable on crowded event Wi-Fi.
+
+### Step 2 — Laptop 1: find its IP address and start the API
+```bash
+# macOS
+ipconfig getifaddr en0
+# Windows (PowerShell)
+ipconfig            # look for "IPv4 Address" under the active adapter
+# Linux
+hostname -I
+```
+Then, from the repo root with the venv active:
+```bash
+uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+```
+Keep this terminal visible during evaluation — the evaluator will be shown these request/response logs. Verify it's reachable from Laptop 1 itself: `http://localhost:8000/health`, and that it loaded a model (`"model_loaded": true` in the response) — if it's `false`, run `python -m scripts.run_full_pipeline` first.
+
+### Step 3 — Laptop 2: point the UI at Laptop 1 and launch it
+```bash
+export API_URL="http://<laptop-1-ip>:8000"     # macOS/Linux
+$env:API_URL="http://<laptop-1-ip>:8000"       # Windows PowerShell
+streamlit run ui/app.py
+```
+(The API URL can also be typed directly into the sidebar text box in the UI.)
+
+### Step 4 — Verify end to end
+On Laptop 2's browser: confirm the trip dropdown populates from `/trips`, pick a trip, click **Reconstruct Route**, and confirm the map + metrics render. Check Laptop 1's terminal shows the matching `Received inference request` / `inference completed` log lines for that trip ID.
+
+### Troubleshooting
+- **Connection refused / timeout:** confirm both laptops show the same Wi-Fi/hotspot network; check firewall prompts on Laptop 1 allow incoming connections on port 8000 (the first `uvicorn` run usually triggers this prompt).
+- **Trips dropdown empty:** `EVALUATOR_TEST_DIR`/`STUDENT_TEST_DIR` must exist and contain trip subfolders on Laptop 1.
+- **`model_loaded: false`:** the API falls back to pure-geometry candidate ranking so the demo still runs, but run `python -m scripts.run_full_pipeline` on Laptop 1 and restart `uvicorn` before the real evaluation.
 
 ---
 
-## 9. Academic Integrity & Anti-Leakage Compliance
+## 7. Evaluation Metrics Reported
 
-This repository complies strictly with PES University's academic integrity policies:
-- **Strict Data Partitioning:** Evaluator testing data is never touched during feature engineering, model training, or hyperparameter selection.
-- **Server-Side Evaluation:** Evaluator ground-truth `.route` files remain strictly server-side on Laptop 1. The client UI receives only the predicted sequence and computed evaluation scores.
-- **No Hardcoded Predictions:** All route predictions are computed dynamically at runtime through the trained model and Viterbi decoder. Live API request/response logs are displayed on Laptop 1's console for evaluator inspection.
+- **Observation-level Top-1 Accuracy** — per GPS observation, does the highest-confidence candidate match the reference arc.
+- **Macro F1-score**, **Log Loss** — candidate-classification quality (row-level, both classes).
+- **Candidate Miss Rate** — fraction of observations where the reference arc wasn't in the candidate set at all (reported honestly in `data/processed/*_quality_log.json`).
+- **Route Continuity** — fraction of consecutive predicted arcs that are directly connected in the road-network graph.
+- **Training / Inference Time** — per model, in `artifacts/results/model_comparison.csv`.
+
+All of these are computed by the exact same `src.pipeline.run_inference` function that the live API calls — the report's numbers and the live demo's numbers cannot drift apart.
+
+---
+
+## 8. Academic Integrity & Anti-Leakage Compliance
+
+- Evaluator-testing data is never touched during feature engineering, training, or hyperparameter search.
+- Evaluator ground-truth `.route` files stay strictly on Laptop 1; `src/api/schemas.py` has no field for them, and `src/api/main.py` never serialises them into a response.
+- No hardcoded trip-id → prediction mapping anywhere in the codebase — every prediction is produced at request time by `src.pipeline.run_inference`.
+- Live API request/response logs are shown on Laptop 1's console during evaluation.

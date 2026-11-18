@@ -17,16 +17,25 @@ def emission_log_probability(distance_meters: float, model_confidence: float = 1
 
 
 def transition_log_probability(
-    from_arc: int,
-    to_arc: int,
+    from_cand: Dict,
+    to_cand: Dict,
     great_circle_dist: float,
     road_graph: RoadNetworkGraph
 ) -> float:
     """
     Computes transition log probability between two candidate arcs.
     log P(S_t+1 | S_t) ~ - |d_road - d_euclid| / beta
+
+    d_road is measured along the road from the candidate's own position on
+    its arc (its projection fraction `t`) to the next candidate's position on
+    its arc - not just the gap between the two arcs' endpoints, which would
+    be ~0 for any directly-connected pair regardless of how far the vehicle
+    actually travelled.
     """
-    road_dist = road_graph.shortest_path_distance(from_arc, to_arc)
+    road_dist = road_graph.route_distance(
+        from_cand["arc_id"], to_cand["arc_id"],
+        from_t=from_cand.get("t", 1.0), to_t=to_cand.get("t", 0.0),
+    )
 
     if np.isinf(road_dist):
         return np.log(DISCONNECTION_PENALTY)
@@ -85,8 +94,8 @@ def viterbi_decode(
 
             for prev_idx, prev_cand in enumerate(prev_cands):
                 t_prob = transition_log_probability(
-                    prev_cand["arc_id"],
-                    curr_cand["arc_id"],
+                    prev_cand,
+                    curr_cand,
                     step_gps_dist,
                     road_graph
                 )
