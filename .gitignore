@@ -49,10 +49,18 @@ venv.bak/
 Thumbs.db
 
 # Large archives & compressed artifacts
-# (data/raw/ is intentionally committed - see bf47503)
+# (data/raw/train and data/raw/student_test are intentionally committed - see bf47503)
 data/processed/
 *.tar.gz
 *.zip
+
+# Evaluator-testing partition: contains official ground-truth .route files.
+# Per Assessment and Plagiarism Policy (sec. 7, "Data Leakage and Evaluation
+# Integrity"): evaluator-testing data must remain untouched during
+# development, and organisers inspect repository history - so this must
+# never be committed, even though data/raw/train and student_test are.
+# It only needs to exist locally on Laptop 1's disk for the API to read it.
+data/raw/evaluator_test/
 
 # Sensitive files
 .env
