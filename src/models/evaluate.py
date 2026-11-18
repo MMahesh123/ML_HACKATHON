@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Any
 import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, log_loss
-
+from sklearn.metrics import f1_score
 
 def calculate_observation_top1_accuracy(
     df: pd.DataFrame,
@@ -95,9 +95,26 @@ def evaluate_predictions(
     y_prob: Optional[np.ndarray] = None,
     road_graph: Optional[Any] = None,
 ) -> Dict[str, float]:
-    """Compatibility wrapper for general prediction evaluation."""
+    """Evaluate candidate classification and ranking performance."""
+
     metrics = calculate_candidate_metrics(y_true, y_pred, y_prob)
+
+    metrics["top_1_accuracy"] = float(
+        accuracy_score(y_true, y_pred)
+    )
+
+    metrics["macro_f1"] = float(
+        f1_score(y_true, y_pred, average="macro", zero_division=0)
+    )
+
+    if y_prob is not None:
+        metrics["log_loss"] = float(
+            log_loss(y_true, y_prob, labels=[0, 1])
+        )
+
     if road_graph is not None:
-        metrics["route_continuity"] = float(calculate_route_continuity(list(y_pred), road_graph))
-    metrics["top_1_accuracy"] = float(accuracy_score(y_true, y_pred))
+        metrics["route_continuity"] = float(
+            calculate_route_continuity(list(y_pred), road_graph)
+        )
+
     return metrics

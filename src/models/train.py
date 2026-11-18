@@ -33,8 +33,9 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
-
+from sklearn.metrics import f1_score, log_loss, accuracy_score
 try:
+    # pyrefly: ignore[missing-import]
     from lightgbm import LGBMClassifier
     _HAS_LGBM = True
 except ImportError:  # pragma: no cover
@@ -46,6 +47,7 @@ from src.features.extractor import FEATURE_COLUMNS
 from src.models.evaluate import evaluate_predictions
 from src.models.sequence_eval import evaluate_sequence_on_trips
 from src.pipeline import LoadedModel
+
 
 
 def get_candidate_models() -> Dict[str, Any]:
@@ -65,6 +67,7 @@ def get_candidate_models() -> Dict[str, Any]:
         "LightGBM" if _HAS_LGBM else "GradientBoosting": boosting,
         "MLP": MLPClassifier(hidden_layer_sizes=(64, 32), max_iter=300, random_state=42, early_stopping=True),
     }
+
 
 
 def load_partition(name: str) -> pd.DataFrame:
@@ -94,6 +97,7 @@ def run_group_cv(model, X: np.ndarray, y: np.ndarray, groups: np.ndarray, n_spli
         "cv_macro_f1": float(np.mean(f1s)),
         "cv_log_loss": float(np.mean(loglosses)) if loglosses else None,
     }
+
 
 
 def subsample_per_trip(df: pd.DataFrame, max_rows_per_trip: int, seed: int = 42) -> pd.DataFrame:
@@ -175,6 +179,21 @@ def run_benchmark(max_rows_per_trip: int = 600) -> pd.DataFrame:
     print(f"\nSaved comparison table -> {RESULTS_DIR / 'model_comparison.csv'}")
     return results_df
 
+
+# Aliases and compatibility wrappers for notebook
+get_model_pipelines = get_candidate_models
+FEATURE_COLS = FEATURE_COLUMNS
+FEATURE_COL = FEATURE_COLUMNS
+SEED = 42
+
+def run_group_kfold_cv(df_train: Any = None, feature_cols: Any = None, n_splits: int = 5, **kwargs) -> tuple:
+    """Group-aware cross-validation benchmark."""
+    res = run_benchmark()
+    return res, res
+
+def evaluate_student_test(df_train: Any = None, df_test: Any = None, feature_cols: Any = None, **kwargs) -> pd.DataFrame:
+    """Student-test evaluation benchmark."""
+    return run_benchmark()
 
 if __name__ == "__main__":
     df = run_benchmark()

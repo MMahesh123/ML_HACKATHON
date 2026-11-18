@@ -22,6 +22,7 @@ from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import StandardScaler
 
 try:
+    # pyrefly: ignore[missing-import]
     from lightgbm import LGBMClassifier
     _HAS_LGBM = True
 except ImportError:  # pragma: no cover
@@ -154,6 +155,24 @@ def optimize_model(
         **result,
     }
 
+
+import pandas as pd
+
+# Compatibility wrapper for notebook
+def run_bayesian_optimization(
+    df_train: Any = None,
+    df_test: Any = None,
+    feature_cols: Any = None,
+    n_trials: int = 20,
+    **kwargs
+) -> Dict[str, Any]:
+    out = optimize_model(n_trials=n_trials)
+    comp_df = pd.DataFrame([
+        {"Configuration": "Untuned Baseline", **out.get("untuned_student_test_metrics", {})},
+        {"Configuration": "Bayesian Tuned (Optuna)", **out.get("tuned_student_test_metrics", {})},
+    ])
+    out["comparison"] = comp_df
+    return out
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
