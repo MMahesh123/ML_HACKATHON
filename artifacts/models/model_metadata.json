@@ -11,19 +11,23 @@
     "prev_arc_connected"
   ],
   "best_params": {
-    "n_estimators": 300,
-    "num_leaves": 44,
-    "max_depth": 6,
-    "learning_rate": 0.05279921386602365,
-    "min_child_samples": 74,
-    "subsample": 0.9210887204441781,
-    "colsample_bytree": 0.649142229555474,
-    "reg_lambda": 4.606882949840221
+    "n_estimators": 220,
+    "num_leaves": 51,
+    "max_depth": 5,
+    "learning_rate": 0.03127362736966396,
+    "min_child_samples": 100,
+    "subsample": 0.6942652495030125,
+    "colsample_bytree": 0.9421688698373979,
+    "reg_lambda": 0.001904784774595465
   },
-  "cv_macro_f1": 0.8185193642763593,
+  "cv_macro_f1": 0.8891774538991537,
   "student_test_metrics": {
-    "top_1_accuracy": 0.9328875277118331,
-    "macro_f1": 0.8070355814561991,
-    "log_loss": 0.1725019240085253
+    "candidate_binary_precision": 0.8163797600417319,
+    "candidate_binary_recall": 0.7772749848242371,
+    "candidate_binary_f1": 0.7963475999321535,
+    "candidate_binary_accuracy": 0.956482605727817,
+    "log_loss": 0.10825834140758565,
+    "top_1_accuracy": 0.956482605727817,
+    "macro_f1": 0.8859930294866913
   }
 }
