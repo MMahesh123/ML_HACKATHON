@@ -94,6 +94,14 @@ section[data-testid="stSidebar"] * { color: #e8e6ff !important; }
     transform: translateY(-3px);
     box-shadow: 0 0 28px rgba(255,0,200,0.25), 0 0 14px rgba(0,229,255,0.2);
 }
+/* Streamlit ellipsises metric text by default, which hid the headline numbers on narrow screens. */
+[data-testid="stMetricValue"], [data-testid="stMetricValue"] > div,
+[data-testid="stMetricLabel"], [data-testid="stMetricLabel"] p {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+}
+[data-testid="stMetricValue"] { font-size: clamp(1.4rem, 2.6vw, 2.25rem) !important; }
 [data-testid="stMetricValue"] {
     background: linear-gradient(90deg, #00e5ff, #ff2fd1);
     -webkit-background-clip: text;
