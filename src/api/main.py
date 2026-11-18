@@ -22,7 +22,9 @@ from src.api.schemas import (
 from src.config import EVALUATOR_TEST_DIR, STUDENT_TEST_DIR, TRAIN_DIR
 from src.data.loader import TripDataLoader
 from src.data.preprocessor import align_route_to_track, clean_track
-from src.models.evaluate import calculate_route_continuity, evaluate_predictions
+from sklearn.metrics import accuracy_score, f1_score
+
+from src.models.evaluate import calculate_route_continuity
 from src.models.export import load_exported_model
 from src.pipeline import run_inference
 
@@ -141,7 +143,13 @@ def predict_trip(req: TripPredictionRequest):
             y_true = reference_arcs[labeled_mask]
             y_pred = [predicted_arcs[i] if predicted_arcs[i] is not None else -1 for i in range(len(predicted_arcs))]
             y_pred = [y_pred[i] for i in range(len(y_pred)) if labeled_mask[i]]
-            metrics_dict = evaluate_predictions(y_true, y_pred)
+            # Arc IDs are multiclass targets, so the binary candidate-level
+            # metrics in evaluate_predictions do not apply here.
+            if len(y_true):
+                metrics_dict = {
+                    "top_1_accuracy": float(accuracy_score(y_true, y_pred)),
+                    "macro_f1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
+                }
 
     clean_sequence = [a for a in predicted_arcs if a is not None]
     route_continuity = calculate_route_continuity(clean_sequence, road_graph) if len(clean_sequence) > 1 else 1.0
