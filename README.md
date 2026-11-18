@@ -128,7 +128,13 @@ python -m pytest tests/ -v
 
 ## 6. Two-Laptop Evaluation Setup
 
-Both laptops need this repository, the venv, and `pip install -r requirements.txt`. **Only Laptop 1** needs the raw dataset and the exported model artifacts (`artifacts/models/`) — Laptop 2 only ever talks to Laptop 1's API.
+Both laptops need this repository and a virtual environment. **Only Laptop 1** needs the raw dataset and the exported model artifacts (`artifacts/models/`) — Laptop 2 only ever talks to Laptop 1's API.
+
+Install with `pip install -r requirements-lock.txt` (the exact versions the shipped model was trained and verified with) rather than `requirements.txt`, whose open-ended lower bounds can pull newer libraries than the pickled model expects.
+
+Two things that look like failures but are not or are easy to fix:
+- **The first API start takes about a minute** on a fresh install while Python compiles the packages; wait for `Application startup complete` before starting the UI. Do this before the review, not during it.
+- **macOS only:** LightGBM needs OpenMP. If `import lightgbm` fails with `libomp.dylib` not found, run `brew install libomp`.
 
 ### Step 0 — Transfer the project
 
