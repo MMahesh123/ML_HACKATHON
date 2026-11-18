@@ -48,8 +48,7 @@ venv.bak/
 .DS_Store
 Thumbs.db
 
-# Large raw datasets & large model artifacts (keep track of repo size limits)
-data/raw/
+# Large archives & compressed artifacts
 *.tar.gz
 *.zip
 

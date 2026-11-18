@@ -1,0 +1,2 @@
+# Place 10 evaluator testing trips here (.track, .nodes, .arcs)
+# Note: Evaluator ground truth .route must remain server-side and never be exposed to the client UI.
